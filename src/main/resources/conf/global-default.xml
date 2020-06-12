@@ -32,7 +32,7 @@
   <property>
     <description>python env path</description>
     <name>shifu.application.python-binary-path</name>
-    <value>/x/home/website/python2.7</value>
+    <value>/home/haifwu/newPython</value>
   </property>
 
     <property>
@@ -44,7 +44,7 @@
     <property>
     <description>glibc path</description>
     <name>shifu.application.glibc-binary-path</name>
-    <value>/x/home/website/glibc2.17</value>
+    <value>/home/haifwu/.tensorflow_yarn/glibc2.17</value>
   </property>
 
   <!-- Task configurations -->
