@@ -31,7 +31,7 @@ from numpy import array
 import numpy as np
 import os
 
-from StringIO import StringIO
+from io import BytesIO
 import gzip
 import itertools
 import datetime
@@ -43,9 +43,7 @@ from abc import ABCMeta, abstractmethod
 MODELS_PATH = "./models"
 
 
-class InputFormat:
-    __metaclass__ = ABCMeta
-
+class InputFormat(metaclass=ABCMeta):
     @abstractmethod
     def next_batch(self):
         pass
@@ -61,29 +59,29 @@ class InputFormat:
     @staticmethod
     def get_file_length(file_path):
         with gfile.Open(file_path, 'rb') as f:
-            gf = gzip.GzipFile(fileobj=StringIO(f.read()))
+            gf = gzip.GzipFile(fileobj=BytesIO(f.read()))
             return sum(1 for line in gf)
 
     @staticmethod
     def get_split(file_path, start, end):
         lines = []
         with gfile.Open(file_path, 'rb') as f:
-            gf = gzip.GzipFile(fileobj=StringIO(f.read()))
+            gf = gzip.GzipFile(fileobj=BytesIO(f.read()))
             for line in itertools.islice(gf, start, end):
-                lines.append(line)
+                lines.append(line.decode())
         return lines
 
     @staticmethod
     def get_first_line(file_path):
         with gfile.Open(file_path, 'rb') as f:
-            gf = gzip.GzipFile(fileobj=StringIO(f.read()))
-            line = gf.readline()
+            gf = gzip.GzipFile(fileobj=BytesIO(f.read()))
+            line = gf.readline().decode()
             return line
 
     @staticmethod
     def tprint(content, log_level="INFO"):
         sys_time = datetime.datetime.now()
-        print(str(sys_time) + " " + log_level + " " + " [Shifu.Tensorflow.train] " + str(content))
+        print((str(sys_time) + " " + log_level + " " + " [Shifu.Tensorflow.train] " + str(content)))
         sys.stdout.flush()
 
 
@@ -131,7 +129,7 @@ class FileInputFormat(InputFormat):
             line_count += 1
             columns = line.split(self._delimiter)
             if self._feature_column_nums is None:
-                self._feature_column_nums = range(0, len(columns))
+                self._feature_column_nums = list(range(0, len(columns)))
                 self._feature_column_nums.remove(self._target_index)
 
             # Append training data
@@ -159,7 +157,7 @@ class FileInputFormat(InputFormat):
 
     def initialize(self):
         all_files = gfile.ListDirectory(self._root_folder)
-        norm_files = filter(lambda x: not x.startswith(".") and not x.startswith("_"), all_files)
+        norm_files = [x for x in all_files if not x.startswith(".") and not x.startswith("_")]
         self.tprint(norm_files)
         self.tprint("Total input file count is " + str(len(norm_files)) + ".")
         sys.stdout.flush()
@@ -191,16 +189,18 @@ class FileInputFormat(InputFormat):
         if len(norm_files) > 0:
             first_file_path = os.path.join(self._root_folder, norm_files[0])
             first_line = self.get_first_line(first_file_path)
+            print(first_line)
+            print(type(first_line))
             columns = first_line.split(self._delimiter)
             if self._feature_column_nums is None:
-                self._feature_column_nums = range(0, len(columns))
+                self._feature_column_nums = list(range(0, len(columns)))
                 self._feature_column_nums.remove(self._target_index)
         self._context["feature_count"] = len(self._feature_column_nums)
 
         # Initial file splits
         full_splits = []
         evaluate_splits = []
-        for file_path, file_line_cnt in self._file_dict.items():
+        for file_path, file_line_cnt in list(self._file_dict.items()):
             full_splits.extend(self.__split_file(file_path, file_line_cnt))
         for file_split in full_splits:
             if random.random() >= self._valid_data_percentage:
@@ -255,7 +255,7 @@ class FileInputFormat(InputFormat):
 
 def tprint(content, log_level="INFO"):
     systime = datetime.datetime.now()
-    print(str(systime) + " " + log_level + " " + " [Shifu.Tensorflow.train] " + str(content))
+    print((str(systime) + " " + log_level + " " + " [Shifu.Tensorflow.train] " + str(content)))
     sys.stdout.flush()
 
 ########################################################################################################################
@@ -551,9 +551,10 @@ if __name__ == "__main__":
                "data_root_folder": root, "target_index": target_index, "valid_data_percentage": valid_data_percentage,
                "delimiter": delimiter}
     if not os.path.exists(MODELS_PATH):
-        os.makedirs(MODELS_PATH, 0777)
+        os.makedirs(MODELS_PATH, 0o777)
 
-    session = tf.Session()
+    tf.compat.v1.disable_eager_execution()
+    session = tf.compat.v1.Session()
 
     # Init input format
     input_format = FileInputFormat(context)
